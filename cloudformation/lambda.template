@@ -1,0 +1,87 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Metadata": {
+  },
+  "Parameters": {
+    "Name": {"Type": "String"},
+    "CodeBucket": {"Type": "String"},
+    "CodeObjectKey": {"Type": "String"}
+  },
+  "Resources": {
+    "Policy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                  "logs:*"
+              ],
+              "Resource": "arn:aws:logs:*:*:*"
+            }
+          ]
+        },
+        "Roles": [{"Ref": "Role"}]
+      }
+    },
+    "Role": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [],
+        "Description": "Execution role for lambda function",
+        "MaxSessionDuration": 3600,
+        "Path": "/role/"
+      }
+    },
+    "Function": {
+      "Type" : "AWS::Lambda::Function",
+      "Properties" : {
+          "Code": {
+            "S3Bucket": {"Ref": "CodeBucket"},
+            "S3Key": {"Ref": "CodeObjectKey"}
+          },
+          "FunctionName": {"Ref": "Name"},
+          "Handler": "function.handler",
+          "Role": {"Fn::GetAtt": ["Role", "ARN"]},
+          "Runtime": "ruby2.7"
+        }
+    },
+    "LogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/lambda/",
+              {
+                "Ref": "Function"
+              }
+            ]
+          ]
+        },
+        "RetentionInDays": 180
+      }
+    }
+  },
+  "Outputs": {
+    "Name": {
+      "Description": "Lambda function name",
+      "Value": {"Ref": "Lambda"}
+    }
+  }
+}
