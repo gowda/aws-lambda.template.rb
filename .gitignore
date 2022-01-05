@@ -1,0 +1,6 @@
+# bundler
+.bundle
+vendor
+
+# generated zip file
+aws-lambda-function.zip

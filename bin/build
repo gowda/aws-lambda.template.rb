@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+
+cleanup_vendor_dir() {
+  rm -rf vendor
+}
+
+configure_bundler() {
+  bundle config set --local deployment 'true'
+  bundle config set --local without 'test development'
+}
+
+reconfigure_bundler() {
+  bundle config unset --local deployment
+  bundle config unset --local without
+}
+
+cleanup_vendor_dir
+configure_bundler
+bundle install
+zip -qr aws-lambda-function.zip Gemfile Gemfile.lock function.rb lib vendor
+reconfigure_bundler
+bundle install

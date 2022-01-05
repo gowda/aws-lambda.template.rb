@@ -1,0 +1,53 @@
+name: deploy
+
+on:
+  workflow_run:
+    workflows:
+      - lint-and-test
+    branches:
+      - master
+    types:
+      - completed
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    env:
+      ZIPFILE: 'aws-lambda-function.zip'
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Ruby 2.7
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.7
+      - name: Install bundler
+        run: gem install bundler -v "$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1)"
+      - uses: actions/cache@v1
+        with:
+          path: vendor/bundle
+          key: ${{ runner.os }}-gems-production-${{ hashFiles('**/Gemfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-gems-production
+      - name: Install dependencies
+        run: |
+          bundle config path vendor/bundle
+          bundle config set without 'test development'
+          bundle install --retry 3
+      - name: Build zip file
+        run: |
+          zip -r $ZIPFILE Gemfile Gemfile.lock function.rb lib vendor
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Push to S3 bucket
+        run: |
+          aws s3 cp beta-configurator.zip s3://${{ secrets.BUCKET_NAME }}/$ZIPFILE
+      - name: Update lambda function code
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ secrets.FUNCTION_NAME }} \
+            --s3-bucket ${{ secrets.BUCKET_NAME }} --s3-key $ZIPFILE
